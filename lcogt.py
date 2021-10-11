@@ -137,7 +137,25 @@ class lcogt(object):
                     'guiding_config': 'ON',
                     'window': 1.0,
                     'ipp': 1.01
-                }
+                },
+                'photometry-frb-time-critical': {
+                    'type': 'photometry-frb-time-critical',
+                    'proposal': [
+                    {'name':'NSF2021B-008','obstype':'TIME_CRITICAL'}
+                    ],
+                    'filters': ['rp'],
+                    'min_exposure': {'default':60},
+                    'max_exposure': 60,
+                    # SNR strategy are pairwise mag, snr values.  first is mag
+                    # and second is snr.  If mag_source < mag, then use snr.
+                    'cadence': 10,
+                    'telescope_class': '1m0',
+                    'instrument_type': '1M0-SCICAM-SINISTRO',
+                    'acquisition_config': 'OFF',
+                    'guiding_config': 'ON',
+                    'window': 15.0/(60*24),
+                    'ipp': 1.2
+                },
             }
         }
 
@@ -150,7 +168,9 @@ class lcogt(object):
                 'FTPEPO2014A-004','ARI2017AB-002','NOAO2020A-008',
                 'NOAO2020A-012','NOAO2020B-011','NOAO2020B-009',
                 'NOAO2021A-016','NOAO2021A-001','TOM2020A-011',
-                'CON2021A-011']
+                'CON2021A-011','CON2021A-003','CON2021A-008',
+                'CON2021B-010','NSF2021B-005','NSF2021B-008',
+                'NSF2021B-012']
 
         self.constants = {
             'zpt': {
