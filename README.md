@@ -1,1 +1,1 @@
-# LCOGT-Obs
+# lcogt
