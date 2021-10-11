@@ -624,6 +624,19 @@ class lcogt(object):
 
         return(exptime)
 
+    # Get the maximum allowable IPP for a requestgroup
+    def get_max_allowable_ipp(self, obs_requests):
+
+        # Get username and password
+        username, password = self.get_username_password()
+
+        uri = self.params['uri']['request']['request']+'max_allowable_ipp/'
+        header = self.get_token_header(username, password, auth_type='request')
+
+        response = requests.post(uri, json=obs_requests, headers=header)
+
+        return(response.json())
+
     """
     LCO API v3 configurations.
     configurations consist of constraints, instrument configuration, acquisition
@@ -735,7 +748,7 @@ class lcogt(object):
     type, and the individual requests.  Send the
     """
     def make_obs_request(self, obj, ra, dec, mag, strategy = 'default',
-        propidx=0):
+        propidx=0, recalculate_ipp=False):
 
         # Get params - strategy data
         strat = self.params['strategy'][strategy]
@@ -756,12 +769,32 @@ class lcogt(object):
 
         # Iterate through the next level of request
         requests = self.make_requests(obj, ra, dec, mag, strat)
+        obs_request['requests']=requests
+
+        if recalculate_ipp:
+            print('Recalculating IPP...')
+            response = self.get_max_allowable_ipp(obs_request)
+            max_ipp = None
+            for key in response.keys():
+                r = response[key]
+                for key in r.keys():
+                    ipp_data = r[key]
+                    if 'max_allowable_ipp_value' in ipp_data.keys():
+                        max_ipp = ipp_data['max_allowable_ipp_value']
+
+            if max_ipp:
+                curr_ipp = obs_request['ipp_value']
+                if max_ipp < curr_ipp:
+                    print('Adjusting IPP value to:',max_ipp)
+                    obs_request['ipp_value']=max_ipp
+                else:
+                    m = 'No need to adjust IPP, {0} < {1}'.format(curr_ipp,
+                        max_ipp)
+                    print(m)
+
         if not requests[0]['configurations']:
             return(None)
         else:
-            obs_request['requests'] = requests
-            print(obs_request)
             response = self.post_user_request(obs_request)
-            print(response.content)
             response = response.json()
             return(response)
