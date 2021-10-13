@@ -45,9 +45,8 @@ class lcogt(object):
                 'default': {
                     'type': 'default',
                     'proposal': [
-                    {'name':'NOAO2021A-001','obstype':'NORMAL'},
-                    {'name':'NOAO2021A-016','obstype':'NORMAL'},
-                    {'name':'TOM2020A-011','obstype':'NORMAL'}
+                    {'name':'NSF2021B-012','obstype':'NORMAL'},
+                    {'name':'NSF2021B-012','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -66,8 +65,9 @@ class lcogt(object):
                 'spectroscopy': {
                     'type': 'spectroscopy',
                     'proposal': [
-                    {'name':'NOAO2021A-001','obstype':'NORMAL'},
-                    {'name':'NOAO2021A-016','obstype':'NORMAL'}
+                    {'name':'NSF2021B-012','obstype':'NORMAL'},
+                    {'name':'NSF2021B-012','obstype':'NORMAL'},
+                    {'name':'CON2021B-010','obstype':'NORMAL'}
                     ],
                     'min_exposure': 300,
                     'max_exposure': 2400,
@@ -82,9 +82,8 @@ class lcogt(object):
                 'photometry': {
                     'type': 'photometry',
                     'proposal': [
-                    {'name':'NOAO2021A-001','obstype':'NORMAL'},
-                    {'name':'NOAO2021A-016','obstype':'NORMAL'},
-                    {'name':'TOM2020A-011','obstype':'NORMAL'}
+                    {'name':'NSF2021B-012','obstype':'NORMAL'},
+                    {'name':'NSF2021B-012','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -103,7 +102,7 @@ class lcogt(object):
                 'photometry-spectral': {
                     'type': 'photometry-spectral',
                     'proposal': [
-                    {'name':'CON2021A-011','obstype':'NORMAL'}
+                    {'name':'CON2021B-010','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -122,7 +121,7 @@ class lcogt(object):
                 'photometry-muscat': {
                     'type': 'photometry-muscat',
                     'proposal': [
-                    {'name':'CON2021A-011','obstype':'NORMAL'}
+                    {'name':'CON2021B-010','obstype':'NORMAL'}
                     ],
                     'filters': ['all'],
                     'min_exposure': {'default':45, 'up':150},
@@ -334,7 +333,7 @@ class lcogt(object):
         params = {'OBSTYPE': 'SPECTRUM', 'public': True}
 
         delta = TimeDelta(14, format='jd')
-        date = Time(datetime.now())+TimeDelta(7*3600*u.s)
+        date = Time(datetime.utcnow())+TimeDelta(7*3600*u.s)
         start = (date-delta).datetime
         fmt=self.params['date_format']
 
@@ -492,6 +491,17 @@ class lcogt(object):
                 'bin_y': 1,
                 'extra_params': {'defocus': 0.0}
             }
+        elif strat['type']=='photometry-frb-time-critical':
+            configuration = {
+                'instrument_name': '1M0-SCICAM-SINISTRO',
+                'optical_elements': {'filter': filt},
+                'mode': 'full_frame',
+                'exposure_time': exptime,
+                'exposure_count': 10,
+                'bin_x': 1,
+                'bin_y': 1,
+                'extra_params': {'defocus': 0.0}
+            }
         elif strat['type']=='spectroscopy':
             configuration = {
                 "bin_x": 1,
@@ -548,8 +558,8 @@ class lcogt(object):
 
     def make_guiding_config(self, strat):
         mode = strat['guiding_config']
-        option = True
-        if 'spec' in strat:
+        optional = True
+        if 'spec' in strat['type']:
             optional=False
         return({'mode': mode, 'optional': optional})
 
@@ -605,9 +615,10 @@ class lcogt(object):
             const = 0.0
 
         snr = 10.
-        for pair in strat['snr']:
-            if mag < pair[0]:
-                snr = pair[1]
+        if 'snr' in strat.keys():
+            for pair in strat['snr']:
+                if mag < pair[0]:
+                    snr = pair[1]
         term1 = 20. * snr**2
         term2 = 0.4 * (mag - self.constants['zpt'][filt] + const)
         exptime = term1 * 10**term2
@@ -726,9 +737,14 @@ class lcogt(object):
     requests is a list of requests each defined by a location, configuration,
     and a window.
     """
-    def make_requests(self, obj, ra, dec, mag, strat):
+    def make_requests(self, obj, ra, dec, mag, strat, start=None):
         location = self.make_location(strat['telescope_class'])
-        dt = Time(datetime.now())+TimeDelta(7*3600*u.s)
+        if start:
+            dt = start
+        else:
+            dt = Time(datetime.utcnow())+TimeDelta(7*3600*u.s)
+            dt = dt.datetime
+        dt = Time(datetime.utcnow())+TimeDelta(7*3600*u.s)
         dt = dt.datetime
         window = self.make_window(dt, strat['window'])
         configurations = self.make_configurations(obj, ra, dec, mag, strat)
@@ -748,7 +764,7 @@ class lcogt(object):
     type, and the individual requests.  Send the
     """
     def make_obs_request(self, obj, ra, dec, mag, strategy = 'default',
-        propidx=0, recalculate_ipp=False):
+        propidx=0, start=None, recalculate_ipp=False):
 
         # Get params - strategy data
         strat = self.params['strategy'][strategy]
@@ -768,7 +784,7 @@ class lcogt(object):
         }
 
         # Iterate through the next level of request
-        requests = self.make_requests(obj, ra, dec, mag, strat)
+        requests = self.make_requests(obj, ra, dec, mag, strat, start=start)
         obs_request['requests']=requests
 
         if recalculate_ipp:
