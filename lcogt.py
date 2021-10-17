@@ -314,14 +314,13 @@ class lcogt(object):
             if response.status_code != 200:
                 print(response.text)
             else:
-                output = []
                 data = response.json()
                 if telid is not None:
                     for r in data['results']:
                         if r['TELID'] in telid:
-                            output.append(r)
+                            results.append(r)
                 else:
-                    output += data['results']
+                    results += data['results']
 
         # Check for RA/Dec constraints
         if ra and dec:
