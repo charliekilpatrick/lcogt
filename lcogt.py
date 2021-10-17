@@ -369,6 +369,12 @@ class lcogt(object):
         # Get authorization token
         headers = self.get_token_header(username, password, auth_type='request')
 
+        if itype is not None:
+            if ',' in itype:
+                itype = itype.split(',')
+            else:
+                itype = [itype]
+
         params = {}
         results = []
         propids = []
@@ -393,7 +399,7 @@ class lcogt(object):
             if itype is not None:
                 for r in copy.copy(response['results']):
                     test = r['requests'][0]['configurations'][0]['instrument_type']
-                    if test != itype:
+                    if test not in itype:
                         response['results'].remove(r)
 
             results += response['results']
