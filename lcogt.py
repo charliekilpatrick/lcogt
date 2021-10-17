@@ -297,8 +297,6 @@ class lcogt(object):
             params['start'] = sdate.datetime.strftime(fmt)
         if edate is not None:
             params['end'] = edate.datetime.strftime(fmt)
-        if telid is not None:
-            params['TELID'] = telid
         if obstype is not None:
             params['OBSTYPE'] = obstype
         if obj is not None:
@@ -316,8 +314,14 @@ class lcogt(object):
             if response.status_code != 200:
                 print(response.text)
             else:
+                output = []
                 data = response.json()
-                results += data['results']
+                if telid is not None:
+                    for r in data['results']:
+                        if r['TELID'] in telid:
+                            output.append(r)
+                else:
+                    output += data['results']
 
         # Check for RA/Dec constraints
         if ra and dec:
