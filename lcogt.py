@@ -274,7 +274,7 @@ class lcogt(object):
     # Get a json object with complete list of observations.  Optional to define
     # a program or date range to narrow search
     def get_obslist(self, propid=None, sdate=None, edate=None, telid=None,
-        obstype=None, rlevel=None, obj=None, reqnum=None):
+        obstype=None, rlevel=None, obj=None, reqnum=None, ra=None, dec=None):
 
         # Get username and password
         username,password = self.get_username_password()
@@ -318,6 +318,28 @@ class lcogt(object):
             else:
                 data = response.json()
                 results += data['results']
+
+        # Check for RA/Dec constraints
+        if ra and dec:
+            remove_result = []
+            from shapely.geometry import Point, Polygon
+            p = Point(ra, dec)
+
+            for i,result in enumerate(results):
+                coords = result['area']['coordinates']
+                keep = False
+
+                for coord in coords:
+                    polygon = Polygon(coord)
+
+                    if polygon.contains(p):
+                        keep = True
+                        break
+
+                if not keep:
+                    remove_result.append(i)
+
+            results = [r for i,r in enumerate(results) if i not in remove_result]
 
         return(results)
 
