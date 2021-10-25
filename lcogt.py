@@ -445,6 +445,8 @@ class lcogt(object):
 
                 # Need to sanitize target, e.g., for spaces
                 target = target.replace(' ','_')
+                target = target.replace('(','')
+                target = target.replace(')','')
 
                 filt = frame['FILTER']
                 idnum = str(frame['id'])
