@@ -169,7 +169,7 @@ class lcogt(object):
                 'NOAO2021A-016','NOAO2021A-001','TOM2020A-011',
                 'CON2021A-011','CON2021A-003','CON2021A-008',
                 'CON2021B-010','NSF2021B-005','NSF2021B-008',
-                'NSF2021B-012','KEY2020B-002']
+                'NSF2021B-012','KEY2020B-002','ANU2021B-001']
 
         self.constants = {
             'zpt': {
