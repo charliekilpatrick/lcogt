@@ -456,9 +456,13 @@ class lcogt(object):
             fullfilename = outrootdir + '/' + filename
             if not os.path.exists(outrootdir):
                 shutil.os.makedirs(outrootdir)
-            if ((not os.path.exists(fullfilename)
-                and not os.path.exists(fullfilename.strip('.fz')) and funpack)
-                and (not os.path.exists(fullfilename))):
+            if funpack:
+                if not os.path.exists(fullfilename.strip('.fz')):
+                    message = 'Downloading LCOGT file: {file}'
+                    print(message.format(file=fullfilename))
+                    with open(fullfilename, 'wb') as f:
+                        f.write(requests.get(frame['url']).content)
+            elif not os.path.exists(fullfilename):
                 message = 'Downloading LCOGT file: {file}'
                 print(message.format(file=fullfilename))
                 with open(fullfilename, 'wb') as f:
