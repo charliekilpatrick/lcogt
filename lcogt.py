@@ -447,6 +447,7 @@ class lcogt(object):
                 target = target.replace(' ','_')
                 target = target.replace('(','')
                 target = target.replace(')','')
+                target = target.replace('/','')
 
                 filt = frame['FILTER']
                 idnum = str(frame['id'])
