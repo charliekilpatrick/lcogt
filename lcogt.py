@@ -45,8 +45,8 @@ class lcogt(object):
                 'default': {
                     'type': 'default',
                     'proposal': [
-                    {'name':'NSF2021B-012','obstype':'NORMAL'},
-                    {'name':'NSF2021B-012','obstype':'NORMAL'}
+                    {'name':'NSF2022A-006','obstype':'NORMAL'},
+                    {'name':'ANU2022A-001','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -66,7 +66,7 @@ class lcogt(object):
                     'type': 'spectroscopy',
                     'proposal': [
                     {'name':'NSF2021B-012','obstype':'NORMAL'},
-                    {'name':'NSF2021B-012','obstype':'NORMAL'},
+                    {'name':'NSF2021B-005','obstype':'NORMAL'},
                     {'name':'CON2021B-010','obstype':'NORMAL'}
                     ],
                     'min_exposure': 300,
@@ -82,8 +82,7 @@ class lcogt(object):
                 'photometry': {
                     'type': 'photometry',
                     'proposal': [
-                    {'name':'NSF2021B-012','obstype':'NORMAL'},
-                    {'name':'NSF2021B-012','obstype':'NORMAL'}
+                    {'name':'NSF2022A-006','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -169,7 +168,8 @@ class lcogt(object):
                 'NOAO2021A-016','NOAO2021A-001','TOM2020A-011',
                 'CON2021A-011','CON2021A-003','CON2021A-008',
                 'CON2021B-010','NSF2021B-005','NSF2021B-008',
-                'NSF2021B-012','KEY2020B-002','ANU2021B-001']
+                'NSF2021B-012','KEY2020B-002','ANU2021B-001',
+                'NSF2022A-006','ANU2022A-001']
 
         self.constants = {
             'zpt': {
@@ -342,7 +342,8 @@ class lcogt(object):
                 if not keep:
                     remove_result.append(i)
 
-            results = [r for i,r in enumerate(results) if i not in remove_result]
+            results = [r for i,r in enumerate(results)
+                if i not in remove_result]
 
         return(results)
 
