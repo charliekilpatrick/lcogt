@@ -64,7 +64,7 @@ rg = lco.get_requestgroups(propid=lco.proposals, itype='1M0-SCICAM-SINISTRO',
 
 # Get all of the targets for which we might want LCOGT imaging
 print('Grabbing targets from YSE PZ...')
-targets = download_targets('lcogt')
+targets = download_targets('lcogt_fast')
 
 if not targets or len(targets)==0:
     print('ERROR: could not get any LCOGT targets from YSE PZ.')
@@ -78,13 +78,31 @@ print('\n\n')
 
 for target in targets:
     needs_obs = True
-    cadence = lco.params['strategy']['default']['cadence']
+    cadence = lco.params['strategy']['fast']['cadence']
     targcoord = SkyCoord(target['ra'], target['dec'], unit='deg')
     mag = target['min_mag']+0.03*(Time(datetime.now()).mjd -\
         Time(target['min_date']).mjd)
 
-    lco.params['strategy']['default']['ipp']=1.0
-    lco.params['strategy']['default']['window']=1.0
+    phase = Time(datetime.now()).mjd - Time(target['disc_date']).mjd
+
+    if phase<1.0:
+        lco.params['strategy']['fast']['ipp']=1.5
+        lco.params['strategy']['fast']['window']=0.25
+        lco.params['strategy']['fast']['cadence']=0.25
+    elif phase<4.0:
+        lco.params['strategy']['fast']['ipp']=1.5
+        lco.params['strategy']['fast']['window']=0.5
+        lco.params['strategy']['fast']['cadence']=0.5
+    elif phase<10.0:
+        lco.params['strategy']['fast']['ipp']=1.5
+        lco.params['strategy']['fast']['window']=1.0
+        lco.params['strategy']['fast']['cadence']=1.0
+    elif phase<30.0:
+        lco.params['strategy']['fast']['ipp']=1.5
+        lco.params['strategy']['fast']['window']=1.0
+        lco.params['strategy']['fast']['cadence']=2.0
+    else:
+        lco.params['strategy']['fast']['proposal'][0]['obstype']='NORMAL'
 
     now = Time(datetime.now())+TimeDelta(7*3600*u.s)
     now = now.mjd
@@ -139,7 +157,8 @@ for target in targets:
         while try_next_proposal:
 
             response = lco.make_obs_request(target['name'], ra, dec,
-                mag, propidx=propidx)
+                mag, propidx=propidx, recalculate_ipp=True,
+                strategy='fast')
 
             if response:
                 if 'non_field_errors' in response.keys():

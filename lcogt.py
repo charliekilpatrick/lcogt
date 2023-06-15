@@ -12,6 +12,9 @@ from dateutil.parser import parse
 from datetime import datetime, timedelta
 import numpy as np
 
+import warnings
+warnings.filterwarnings('ignore')
+
 class lcogt(object):
     def __init__(self, shibboleth_file):
         """ "Shibboleth" here refers to a owner read-only file (lcogt will
@@ -45,8 +48,29 @@ class lcogt(object):
                 'default': {
                     'type': 'default',
                     'proposal': [
-                    {'name':'NSF2022A-006','obstype':'NORMAL'},
-                    {'name':'ANU2022A-001','obstype':'NORMAL'}
+                    {'name':'NSF2023A-011','obstype':'NORMAL'},
+                    {'name':'NSF2023A-015','obstype':'NORMAL'}
+                    ],
+                    'filters': ['up', 'gp', 'rp', 'ip'],
+                    'min_exposure': {'default':45, 'up':150},
+                    'max_exposure': 540,
+                    # SNR strategy are pairwise mag, snr values.
+                    # If current source magnitude is < mag, then use given snr.
+                    'snr': [[16,40],[18,20],[99,10]],
+                    'cadence': 4,
+                    'telescope_class': '1m0',
+                    'instrument_type': '1M0-SCICAM-SINISTRO',
+                    'acquisition_config': 'OFF',
+                    'guiding_config': 'ON',
+                    'window': 1.0,
+                    'ipp': 1.0
+                },
+                'fast': {
+                    'type': 'photometry',
+                    'proposal': [
+                    {'name':'NSF2023A-011','obstype':'TIME_CRITICAL'},
+                    {'name':'NSF2023A-011','obstype':'NORMAL'},
+                    {'name':'NSF2023A-015','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -82,7 +106,8 @@ class lcogt(object):
                 'photometry': {
                     'type': 'photometry',
                     'proposal': [
-                    {'name':'NSF2022A-006','obstype':'NORMAL'}
+                    {'name':'NSF2023A-011','obstype':'NORMAL'},
+                    {'name':'NSF2023A-015','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -169,7 +194,10 @@ class lcogt(object):
                 'CON2021A-011','CON2021A-003','CON2021A-008',
                 'CON2021B-010','NSF2021B-005','NSF2021B-008',
                 'NSF2021B-012','KEY2020B-002','ANU2021B-001',
-                'NSF2022A-006','ANU2022A-001']
+                'NSF2022A-006','ANU2022A-001','CON2022A-008',
+                'NSF2022B-022','NSF2022B-020','NSF2022B-012',
+                'CON2022B-007','NSF2023A-011','NSF2023A-015',
+                'ANU2023A-001','NSF2022A-006','ANU2022A-001']
 
         self.constants = {
             'zpt': {
@@ -274,7 +302,8 @@ class lcogt(object):
     # Get a json object with complete list of observations.  Optional to define
     # a program or date range to narrow search
     def get_obslist(self, propid=None, sdate=None, edate=None, telid=None,
-        obstype=None, rlevel=None, obj=None, reqnum=None, ra=None, dec=None):
+        obstype=None, rlevel=None, obj=None, reqnum=None, ra=None, dec=None,
+        public=False):
 
         # Get username and password
         username,password = self.get_username_password()
@@ -303,15 +332,28 @@ class lcogt(object):
             params['OBJECT'] = obj
         if reqnum is not None:
             params['REQNUM'] = reqnum
+        if public:
+            params['public']=True
+        if ra and dec:
+            params['covers']='POINT({0} {1})'.format(ra, dec)
 
-        for pid in propids:
-            params['PROPID'] = pid
+        if len(propids)>0:
+            for pid in propids:
+                params['PROPID'] = pid
 
-            # Now do request
+                # Now do request
+                response = requests.get(self.params['uri']['archive']['frames'],
+                    params=params, headers=headers)
+
+                if response.status_code != 200:
+                    print(response.text)
+                else:
+                    data = response.json()
+                    results += data['results']
+        else:
             response = requests.get(self.params['uri']['archive']['frames'],
                 params=params, headers=headers)
-
-            if response.status_code != 200:
+            if response.status_code!=200:
                 print(response.text)
             else:
                 data = response.json()
@@ -435,22 +477,38 @@ class lcogt(object):
     # Given an input obslist from the LCOGT archive, download the associated
     # files for each element
     def download_obslist(self, obslist, outrootdir='', use_basename=False,
-        skip_header=False, funpack=True):
+        skip_header=False, funpack=True, force_objname=''):
 
         for frame in obslist:
             filename = ''
             if use_basename:
                 filename = frame['basename'] + '.fits.fz'
             else:
-                target = frame['OBJECT']
+                if force_objname:
+                    target = force_objname
+                else:
+                    target = frame['OBJECT'].lower()
 
-                # Need to sanitize target, e.g., for spaces
-                target = target.replace(' ','_')
-                target = target.replace('(','')
-                target = target.replace(')','')
-                target = target.replace('/','')
+                    if target.startswith('at'):
+                        target = target[2:]
+                    elif target.startswith('sn'):
+                        target = target[2:]
+
+                    target = target.strip()
+
+                    # Need to sanitize target, e.g., for spaces
+                    target = target.replace(' ','_')
+                    target = target.replace('(','')
+                    target = target.replace(')','')
+                    target = target.replace('/','')
+
+                if not target:
+                    target = 'field'+str(frame['id'])
 
                 filt = frame['FILTER']
+
+                if filt.lower() in ['opaque']: continue
+
                 idnum = str(frame['id'])
                 date = Time(frame['DATE_OBS']).datetime.strftime('ut%y%m%d')
                 filename = target + '.' + date + '.' +\
@@ -458,12 +516,18 @@ class lcogt(object):
             fullfilename = outrootdir + '/' + filename
             if not os.path.exists(outrootdir):
                 shutil.os.makedirs(outrootdir)
+
             if funpack:
                 if not os.path.exists(fullfilename.strip('.fz')):
                     message = 'Downloading LCOGT file: {file}'
                     print(message.format(file=fullfilename))
                     with open(fullfilename, 'wb') as f:
                         f.write(requests.get(frame['url']).content)
+                else:
+                    message = 'LCOGT file: {file} already exists!'
+                    print(message.format(file=fullfilename.strip('.fz')))
+                    file_exists = True
+
             elif not os.path.exists(fullfilename):
                 message = 'Downloading LCOGT file: {file}'
                 print(message.format(file=fullfilename))
@@ -482,11 +546,12 @@ class lcogt(object):
                 os.remove(fullfilename)
 
             # Remove extraneous extension
-            if not skip_header:
+            if not skip_header and not file_exists:
                 hdulist = fits.open(fullfilename.strip('.fz'))
                 newhdu = fits.HDUList()
                 hdu = hdulist['SCI']
                 hdu.header['OBSTYPE'] = 'OBJECT'
+                hdu.header['OBJECT'] = target
                 newhdu.append(hdu)
                 newhdu.writeto(fullfilename.strip('.fz'), overwrite=True)
 
@@ -520,6 +585,17 @@ class lcogt(object):
     # Imaging specific
     def make_instrument_configs(self, filt, exptime, strat, readout='SLOW'):
         if strat['type']=='default':
+            configuration = {
+                'instrument_name': '1M0-SCICAM-SINISTRO',
+                'optical_elements': {'filter': filt},
+                'mode': 'full_frame',
+                'exposure_time': exptime,
+                'exposure_count': 1,
+                'bin_x': 1,
+                'bin_y': 1,
+                'extra_params': {'defocus': 0.0}
+            }
+        elif strat['type']=='photometry':
             configuration = {
                 'instrument_name': '1M0-SCICAM-SINISTRO',
                 'optical_elements': {'filter': filt},
@@ -668,7 +744,11 @@ class lcogt(object):
         else:
             min_exposure = strat['min_exposure']['default']
         if exptime < min_exposure:
-            exptime = min_exposure
+            if mag < 13.0:
+                exptime = min_exposure/2.0
+            else:
+                exptime = min_exposure
+
         if exptime > strat['max_exposure']:
             return(None)
 
@@ -694,20 +774,28 @@ class lcogt(object):
     type, and observation priority.  This method will construct a series of
     configurations for a single target.
     """
-    def make_configurations(self, obj, ra, dec, mag, strat):
+    def make_configurations(self, obj, ra, dec, mag, strat, inst_config={}):
         # Iterate over each filter and append to configurations list
         configurations = []
 
         # If default, construct configurations for photometry strategy
-        if strat['type']=='default' or 'photometry' in strat['type']:
+        if (strat['type']=='default' or 'photometry' in strat['type']):
             for i,filt in enumerate(strat['filters']):
                 constraints = self.make_constraints()
 
                 # Get exposure time and make instrument_config
-                exptime = self.get_exposure_time(filt, mag, strat)
-                if not exptime:
-                    continue
-                instrument_configs = self.make_instrument_configs(filt, exptime, strat)
+                if (inst_config and 'exptime' in inst_config.keys() and
+                    'filter' in inst_config.keys()):
+                    if filt!=inst_config['filter']: continue
+                    exptime = inst_config['exptime']
+                    instrument_configs = self.make_instrument_configs(filt,
+                        exptime, strat)
+                else:
+                    exptime = self.get_exposure_time(filt, mag, strat)
+                    if not exptime:
+                        continue
+                    instrument_configs = self.make_instrument_configs(filt,
+                        exptime, strat)
 
                 # Make acquisition and guiding config with strat
                 acquisition_config = self.make_acquisition_config(strat)
@@ -776,7 +864,9 @@ class lcogt(object):
     requests is a list of requests each defined by a location, configuration,
     and a window.
     """
-    def make_requests(self, obj, ra, dec, mag, strat, start=None):
+    def make_requests(self, obj, ra, dec, mag, strat, start=None,
+        inst_config={}):
+
         location = self.make_location(strat['telescope_class'])
         if start:
             dt = start
@@ -785,8 +875,10 @@ class lcogt(object):
             dt = dt.datetime
         dt = Time(datetime.utcnow())+TimeDelta(7*3600*u.s)
         dt = dt.datetime
+
         window = self.make_window(dt, strat['window'])
-        configurations = self.make_configurations(obj, ra, dec, mag, strat)
+        configurations = self.make_configurations(obj, ra, dec, mag, strat,
+            inst_config=inst_config)
 
         requests = [{
             'location': location,
@@ -803,7 +895,7 @@ class lcogt(object):
     type, and the individual requests.  Send the
     """
     def make_obs_request(self, obj, ra, dec, mag, strategy = 'default',
-        propidx=0, start=None, recalculate_ipp=False):
+        propidx=0, start=None, recalculate_ipp=False, inst_config={}):
 
         # Get params - strategy data
         strat = self.params['strategy'][strategy]
@@ -823,17 +915,25 @@ class lcogt(object):
         }
 
         # Iterate through the next level of request
-        requests = self.make_requests(obj, ra, dec, mag, strat, start=start)
+        requests = self.make_requests(obj, ra, dec, mag, strat, start=start,
+            inst_config=inst_config)
         obs_request['requests']=requests
 
-        if recalculate_ipp:
+        if recalculate_ipp and len(requests[0]['configurations'])>0:
             print('Recalculating IPP...')
             response = self.get_max_allowable_ipp(obs_request)
+            try:
+                if 'non_field_errors' in obs_request[0].keys():
+                    print('ERROR in obs request',obs_request)
+                    return(None)
+            except:
+                pass
             max_ipp = None
             for key in response.keys():
                 r = response[key]
                 for key in r.keys():
                     ipp_data = r[key]
+                    print(ipp_data)
                     if 'max_allowable_ipp_value' in ipp_data.keys():
                         max_ipp = ipp_data['max_allowable_ipp_value']
 
@@ -846,6 +946,7 @@ class lcogt(object):
                     m = 'No need to adjust IPP, {0} < {1}'.format(curr_ipp,
                         max_ipp)
                     print(m)
+
 
         if not requests[0]['configurations']:
             return(None)
