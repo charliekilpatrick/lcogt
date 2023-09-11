@@ -48,8 +48,7 @@ class lcogt(object):
                 'default': {
                     'type': 'default',
                     'proposal': [
-                    {'name':'NSF2023A-011','obstype':'NORMAL'},
-                    {'name':'NSF2023A-015','obstype':'NORMAL'}
+                    {'name':'NSF2023B-004','obstype':'NORMAL'},
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -68,9 +67,7 @@ class lcogt(object):
                 'fast': {
                     'type': 'photometry',
                     'proposal': [
-                    {'name':'NSF2023A-011','obstype':'TIME_CRITICAL'},
-                    {'name':'NSF2023A-011','obstype':'NORMAL'},
-                    {'name':'NSF2023A-015','obstype':'NORMAL'}
+                    {'name':'NSF2023B-004','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -89,9 +86,7 @@ class lcogt(object):
                 'spectroscopy': {
                     'type': 'spectroscopy',
                     'proposal': [
-                    {'name':'NSF2021B-012','obstype':'NORMAL'},
-                    {'name':'NSF2021B-005','obstype':'NORMAL'},
-                    {'name':'CON2021B-010','obstype':'NORMAL'}
+                    {'name':'NSF2023B-004','obstype':'NORMAL'}
                     ],
                     'min_exposure': 300,
                     'max_exposure': 2400,
@@ -106,8 +101,7 @@ class lcogt(object):
                 'photometry': {
                     'type': 'photometry',
                     'proposal': [
-                    {'name':'NSF2023A-011','obstype':'NORMAL'},
-                    {'name':'NSF2023A-015','obstype':'NORMAL'}
+                    {'name':'NSF2023B-004','obstype':'NORMAL'}
                     ],
                     'filters': ['up', 'gp', 'rp', 'ip'],
                     'min_exposure': {'default':45, 'up':150},
@@ -122,6 +116,26 @@ class lcogt(object):
                     'guiding_config': 'ON',
                     'window': 1.0,
                     'ipp': 1.01
+                },
+                'template': {
+                    'type': 'photometry',
+                    'proposal': [
+                    {'name':'NSF2023A-011','obstype':'TIME_CRITICAL'},
+                    {'name':'NSF2023A-015','obstype':'NORMAL'}
+                    ],
+                    'filters': ['up', 'gp', 'rp', 'ip'],
+                    'min_exposure': {'default':600, 'up':600},
+                    'max_exposure': 600,
+                    # SNR strategy are pairwise mag, snr values.  first is mag
+                    # and second is snr.  If mag_source < mag, then use snr.
+                    'snr': [[16,40],[18,20],[99,10]],
+                    'cadence': 0,
+                    'telescope_class': '1m0',
+                    'instrument_type': '1M0-SCICAM-SINISTRO',
+                    'acquisition_config': 'OFF',
+                    'guiding_config': 'ON',
+                    'window': 1.0,
+                    'ipp': 1.2
                 },
                 'photometry-spectral': {
                     'type': 'photometry-spectral',
@@ -197,7 +211,8 @@ class lcogt(object):
                 'NSF2022A-006','ANU2022A-001','CON2022A-008',
                 'NSF2022B-022','NSF2022B-020','NSF2022B-012',
                 'CON2022B-007','NSF2023A-011','NSF2023A-015',
-                'ANU2023A-001','NSF2022A-006','ANU2022A-001']
+                'ANU2023A-001','NSF2022A-006','ANU2022A-001',
+                'NSF2023B-004']
 
         self.constants = {
             'zpt': {
@@ -364,29 +379,6 @@ class lcogt(object):
                 else:
                     results += data['results']
 
-        # Check for RA/Dec constraints
-        if ra and dec:
-            remove_result = []
-            from shapely.geometry import Point, Polygon
-            p = Point(ra, dec)
-
-            for i,result in enumerate(results):
-                coords = result['area']['coordinates']
-                keep = False
-
-                for coord in coords:
-                    polygon = Polygon(coord)
-
-                    if polygon.contains(p):
-                        keep = True
-                        break
-
-                if not keep:
-                    remove_result.append(i)
-
-            results = [r for i,r in enumerate(results)
-                if i not in remove_result]
-
         return(results)
 
     def get_standardobs(self, sdate=None, telid=None, rlevel=None):
@@ -517,6 +509,7 @@ class lcogt(object):
             if not os.path.exists(outrootdir):
                 shutil.os.makedirs(outrootdir)
 
+            file_exists = False
             if funpack:
                 if not os.path.exists(fullfilename.strip('.fz')):
                     message = 'Downloading LCOGT file: {file}'
@@ -536,6 +529,7 @@ class lcogt(object):
             else:
                 message = 'LCOGT file: {file} already exists!'
                 print(message.format(file=fullfilename.strip('.fz')))
+                file_exists = True
 
 
             # funpack
@@ -922,10 +916,18 @@ class lcogt(object):
         if recalculate_ipp and len(requests[0]['configurations'])>0:
             print('Recalculating IPP...')
             response = self.get_max_allowable_ipp(obs_request)
+            print(response)
             try:
-                if 'non_field_errors' in obs_request[0].keys():
-                    print('ERROR in obs request',obs_request)
-                    return(None)
+                if 'errors' in response.keys() and 'requests' in response['errors'].keys():
+                    data = response['errors']['requests']
+                    if 'non_field_errors' in data[0].keys():
+                        print('ERROR in obs request',obs_request)
+                        return(None)
+                elif 'errors' in response.keys():
+                    data = response['errors']
+                    if 'non_field_errors' in data.keys():
+                        print('ERROR in obs request',obs_request)
+                        return(None)
             except:
                 pass
             max_ipp = None
